@@ -378,6 +378,7 @@ def detect_anomalies(logs: List[Dict]) -> Dict:
     anomalous_ips = set()
     rule_based_count = 0
     statistical_count = 0
+    hybrid_count = 0
     
     for i, ip in enumerate(ips):
         features = ip_features[ip]
@@ -398,8 +399,7 @@ def detect_anomalies(logs: List[Dict]) -> Dict:
         # Determine detection method
         if triggered_rules and isolation_score >= 0.6:
             method = "Hybrid"
-            rule_based_count += 1  # Count hybrid as both
-            statistical_count += 1
+            hybrid_count += 1
         elif triggered_rules:
             method = "Rule-based"
             rule_based_count += 1
@@ -455,6 +455,7 @@ def detect_anomalies(logs: List[Dict]) -> Dict:
     detection_breakdown = {
         "rule_based": rule_based_count,
         "statistical": statistical_count,
+        "hybrid": hybrid_count,
         "total": len(anomalies)
     }
     

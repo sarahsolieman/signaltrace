@@ -22,7 +22,7 @@ interface AnalysisData {
   anomaly_count: number
   risk_level: string
   summary: string
-  detection_breakdown: { rule_based: number; statistical: number; total: number }
+  detection_breakdown: { rule_based: number; statistical: number; hybrid: number; total: number }
   time_range: { start: string; end: string; duration_hours: number }
   peak_activity?: { hour: number; event_count: number }
   timeline: Array<{ timestamp: string; clientip: string; detection_type: string; severity: string }>
@@ -182,11 +182,15 @@ export default function ResultsPage() {
           <div style={{ marginBottom: '1.5rem' }}>
             <div style={{ fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem' }}>Detection Breakdown</div>
             <div style={{ fontSize: '0.875rem', color: '#666' }}>
-              Rule-based: {data.detection_breakdown.rule_based} | 
-              Statistical: {data.detection_breakdown.statistical} | 
-              Total: {data.detection_breakdown.total}
-            </div>
-          </div>
+                    Rule-based: {data.detection_breakdown.rule_based} | 
+                    Statistical: {data.detection_breakdown.statistical} | 
+                    Hybrid: {data.detection_breakdown.hybrid || 0} | 
+                    Total: {data.detection_breakdown.total}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#999', marginTop: '0.25rem' }}>
+                    Hybrid = Both rule triggers AND statistical anomaly
+                  </div>
+                </div>
 
           <div style={{
             padding: '1rem',
