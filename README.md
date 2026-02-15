@@ -32,9 +32,9 @@ select any `.jsonl` file from the `data/` folder, and click "Analyze Log File".
 | `baseline_small.jsonl` | 1,000 normal events | 0 anomalies, Low risk |
 | `baseline_medium.jsonl` | 3,000 normal events | 0 anomalies, Low risk |
 | `baseline_large.jsonl` | 5,000 normal events | 0 anomalies, Low risk |
-| `anomalous_credential_stuffing.jsonl` | Credential stuffing attack | Critical severity, High risk |
-| `anomalous_exfiltration.jsonl` | Data exfiltration | Critical severity, High risk |
-| `anomalous_scanning.jsonl` | Network scanning | High severity, Medium risk |
+| `anomalous_credential_stuffing.jsonl` | Credential stuffing attack | 1 Critical anomaly, High risk |
+| `anomalous_exfiltration.jsonl` | Data exfiltration | 1 Critical anomaly, High risk |
+| `anomalous_scanning.jsonl` | Network scanning | 1 High anomaly, High risk |
 
 ### Anomaly Scenarios
 
@@ -143,27 +143,34 @@ Severity is derived deterministically:
 - No rule triggers
 
 **Rationale**: Statistical-only anomalies require higher confidence thresholds to reduce false positives. Rule-based detections leverage explicit attack patterns and thus require less statistical confirmation.
+
 ### Confidence Score
 
 Confidence (0-1) is calculated as:
-
 ```
 confidence = (0.7 × rule_score) + (0.3 × isolation_score)
 
 where:
-  rule_score = min(triggered_rules_count / 3, 1.0)
-  isolation_score = normalized IsolationForest anomaly score
+  rule_score = triggered_rules_count / 5  (5 total rules defined)
+  isolation_score = normalized IsolationForest anomaly score (0-1)
 ```
 
-This represents **signal strength**, not probability of maliciousness.
+**Total Rules Defined:**
+1. High Burst (requests_per_minute_peak ≥ 100)
+2. High Deny Rate (deny_rate ≥ 0.6)
+3. Extreme Data Transfer (total_bytes_transferred ≥ 50 MB)
+4. High Unique Hosts (unique_hosts_count ≥ 20)
+5. High Off-Hours Activity (off_hours_request_ratio ≥ 0.7)
+
+**Maximum Confidence:** Achieved when all 5 rules trigger AND IsolationForest score = 1.0
 
 ### Risk Level Derivation
 
 Overall risk is determined from severity distribution:
 
-- **High Risk**: ≥1 Critical anomaly OR ≥3 High anomalies
-- **Medium Risk**: 1-2 High anomalies OR multiple Medium anomalies
-- **Low Risk**: Only Medium/Low anomalies or none
+- **High Risk**: ≥1 Critical anomaly OR ≥1 High anomaly
+- **Medium Risk**: ≥1 Medium anomaly OR ≥3 Low anomalies
+- **Low Risk**: Only 1-2 Low anomalies or none
 
 ## Frontend Layout
 
@@ -274,7 +281,7 @@ Upload each anomalous file and verify:
    - 1 High anomaly (IP 198.51.100.89)
    - Triggered rules: High Unique Hosts, High Deny Rate
    - Confidence: ~0.75-0.85
-   - Risk: Medium
+   - Risk: High
 
 ## Project Structure
 

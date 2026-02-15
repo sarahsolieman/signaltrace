@@ -316,8 +316,11 @@ def calculate_confidence(triggered_rules: List[str], isolation_score: float) -> 
     rule_weight = 0.7
     if_weight = 0.3
     
+    # Total possible rules
+    total_rules = 5  # High Burst, High Deny Rate, Extreme Data Transfer, High Unique Hosts, High Off-Hours
+    
     # Rule contribution (0-1)
-    rule_score = min(len(triggered_rules) / 3, 1.0)  # Cap at 3 rules
+    rule_score = min(len(triggered_rules) / total_rules, 1.0)
     
     # IF contribution (already 0-1)
     if_contribution = isolation_score
