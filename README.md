@@ -20,7 +20,7 @@ docker compose up --build
 **Deployment**: Docker Compose
 
 ## Sample Data
-
+git branch -M main
 Pre-generated log files in `data/`:
 
 | File | Description | Expected Behavior |
@@ -81,11 +81,15 @@ Explicit thresholds trigger high-confidence detections:
 Unsupervised statistical anomaly detection:
 
 - **Input**: 5-dimensional feature vector per IP
-- **Model**: IsolationForest with `contamination=0.1`
+- **Model**: IsolationForest with `contamination=0.03`
 - **Output**: Anomaly score normalized to 0-1 range
-- **Threshold**: Score ≥ 0.6 for flagging
+- **Threshold**: Score ≥ 0.75 for flagging (statistical-only detections)
 
-IsolationForest identifies behavioral outliers that may not match known patterns.
+**Contamination Calibration**: Set to 3% based on realistic enterprise traffic patterns where most IPs exhibit normal behavior. This prevents false positives from normal variance in baseline traffic.
+
+**Threshold Rationale**: Statistical-only detections require high confidence (≥0.85 for Medium severity) to avoid alert fatigue. Rule-based detections have lower bars since patterns are explicit.
+
+IsolationForest identifies behavioral outliers that may not match known attack patterns.
 
 ### Severity Assignment
 
@@ -100,12 +104,13 @@ Severity is derived deterministically:
 
 **Medium**:
 - Any single rule trigger OR
-- IsolationForest score ≥ 0.75
+- IsolationForest score ≥ 0.85 (very strong statistical signal)
 
 **Low**:
-- IsolationForest score between 0.6 and 0.75
+- IsolationForest score between 0.75 and 0.85
 - No rule triggers
 
+**Rationale**: Statistical-only anomalies require higher confidence thresholds to reduce false positives. Rule-based detections leverage explicit attack patterns and thus require less statistical confirmation.
 ### Confidence Score
 
 Confidence (0-1) is calculated as:
