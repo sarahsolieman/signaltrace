@@ -335,20 +335,77 @@ def detect_anomalies(logs: List[Dict]) -> Dict:
     # Extract per-IP features
     ip_features = extract_features_per_ip(logs)
     
-    if len(ip_features) < 2:
-        # Not enough IPs for IsolationForest
+    if len(ip_features) < 20:
+        # Not enough IPs for meaningful IsolationForest analysis
+        # Fall back to rule-based detection only
+        
+        rule_anomalies = []
+        anomalous_ips = set()
+        
+        for ip, features in ip_features.items():
+            # Apply deterministic rules
+            triggered_rules = apply_deterministic_rules(ip, features)
+            
+            if not triggered_rules:
+                continue  # Not anomalous
+            
+            # Assign severity based on rules only
+            if ("High Burst" in triggered_rules and "High Deny Rate" in triggered_rules):
+                severity = "Critical"
+            elif ("Extreme Data Transfer" in triggered_rules and "High Off-Hours Activity" in triggered_rules):
+                severity = "Critical"
+            elif len(triggered_rules) >= 2:
+                severity = "High"
+            else:
+                severity = "Medium"
+            
+            confidence = min(len(triggered_rules) / 3, 1.0)
+            
+            rule_anomalies.append({
+                "clientip": ip,
+                "severity": severity,
+                "confidence": round(confidence, 2),
+                "detection_method": "Rule-based",
+                "triggered_rules": triggered_rules,
+                "features": {
+                    "requests_per_minute_peak": round(features['requests_per_minute_peak'], 1),
+                    "deny_rate": round(features['deny_rate'], 2),
+                    "total_bytes_transferred": features['total_bytes_transferred'],
+                    "unique_hosts_count": features['unique_hosts_count'],
+                    "off_hours_request_ratio": round(features['off_hours_request_ratio'], 2)
+                },
+                "isolation_score": 0,
+                "explanation": f"Triggered rules: {', '.join(triggered_rules)}",
+                "first_seen": min(features['timestamps']).isoformat() if features['timestamps'] else None,
+                "request_count": features['request_count']
+            })
+            
+            anomalous_ips.add(ip)
+        
+        # Generate summary
+        summary = generate_summary(len(logs), len(ip_features), rule_anomalies)
+        risk_level = calculate_risk_level(rule_anomalies)
+        timeline = build_timeline(rule_anomalies)
+        
         return {
             "total_logs": len(logs),
-            "anomaly_count": 0,
-            "risk_level": "Low",
-            "summary": f"Analyzed {len(logs)} logs from {len(ip_features)} IP(s). Insufficient data for statistical analysis.",
-            "detection_breakdown": {"rule_based": 0, "statistical": 0, "total": 0},
+            "anomaly_count": len(rule_anomalies),
+            "risk_level": risk_level,
+            "summary": summary if rule_anomalies else f"Analyzed {len(logs)} logs from {len(ip_features)} IPs. No anomalies detected. All traffic appears normal.",
+            "detection_breakdown": {
+                "rule_based": len(rule_anomalies),
+                "statistical": 0,
+                "hybrid": 0,
+                "total": len(rule_anomalies)
+            },
             "time_range": get_time_range(logs),
-            "peak_activity": None,
-            "timeline": [],
-            "anomalies": [],
-            "logs": prepare_log_table(logs, set())
+            "peak_activity": get_peak_activity(logs),
+            "timeline": timeline,
+            "anomalies": rule_anomalies,
+            "logs": prepare_log_table(logs, anomalous_ips)
         }
+    
+    # If we reach here, we have ≥20 IPs - use full hybrid detection
     
     # Prepare feature matrix for IsolationForest
     ips = list(ip_features.keys())
@@ -360,9 +417,8 @@ def detect_anomalies(logs: List[Dict]) -> Dict:
         ip_features[ip]['off_hours_request_ratio']
     ] for ip in ips])
     
-    # Fit IsolationForest (expect 3% anomalies - realistic for enterprise traffic)
-    # With auto contamination. This prevents forced flagging in small datasets
-    iso_forest = IsolationForest(contamination='auto', random_state=42)
+    # Fit IsolationForest
+    iso_forest = IsolationForest(contamination=0.03, random_state=42)
     predictions = iso_forest.fit_predict(X)
     scores = iso_forest.score_samples(X)
     
@@ -398,7 +454,7 @@ def detect_anomalies(logs: List[Dict]) -> Dict:
         confidence = calculate_confidence(triggered_rules, isolation_score)
         
         # Determine detection method
-        if triggered_rules and isolation_score >= 0.6:
+        if triggered_rules and isolation_score >= 0.75:
             method = "Hybrid"
             hybrid_count += 1
         elif triggered_rules:
@@ -412,7 +468,7 @@ def detect_anomalies(logs: List[Dict]) -> Dict:
         explanation_parts = []
         if triggered_rules:
             explanation_parts.append(f"Triggered rules: {', '.join(triggered_rules)}")
-        if isolation_score >= 0.6:
+        if isolation_score >= 0.75:
             explanation_parts.append(f"Statistical anomaly score: {isolation_score:.2f}")
         
         explanation = ". ".join(explanation_parts)
