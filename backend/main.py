@@ -476,19 +476,26 @@ def calculate_risk_level(anomalies: List[Dict]) -> str:
     """
     Derive risk level from severity counts
     
-    High Risk: ≥1 Critical OR ≥3 High
-    Medium Risk: 1-2 High OR multiple Medium
-    Low Risk: Only Medium/Low
+    High Risk: ≥1 Critical OR ≥1 High
+    Medium Risk: ≥1 Medium OR multiple Low
+    Low Risk: Only Low anomalies
     """
     if not anomalies:
         return "Low"
     
     critical_count = sum(1 for a in anomalies if a['severity'] == 'Critical')
     high_count = sum(1 for a in anomalies if a['severity'] == 'High')
+    medium_count = sum(1 for a in anomalies if a['severity'] == 'Medium')
     
-    if critical_count >= 1 or high_count >= 3:
+    # High risk: any Critical or High severity
+    if critical_count >= 1 or high_count >= 1:
         return "High"
+    
+    # Medium risk: any Medium severity or multiple Low
+    if medium_count >= 1 or len(anomalies) >= 3:
         return "Medium"
+    
+    # Low risk: only Low severity anomalies
     return "Low"
 
 
