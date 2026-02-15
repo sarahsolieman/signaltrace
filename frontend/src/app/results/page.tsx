@@ -280,6 +280,7 @@ export default function ResultsPage() {
                             borderRadius: '12px',
                             fontSize: '0.75rem',
                             fontWeight: 500
+                            marginRight: '0.5rem'
                           }}>
                             {rule}
                           </span>

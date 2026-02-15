@@ -398,6 +398,8 @@ def detect_anomalies(logs: List[Dict]) -> Dict:
         # Determine detection method
         if triggered_rules and isolation_score >= 0.6:
             method = "Hybrid"
+            rule_based_count += 1  # Count hybrid as both
+            statistical_count += 1
         elif triggered_rules:
             method = "Rule-based"
             rule_based_count += 1
@@ -486,7 +488,6 @@ def calculate_risk_level(anomalies: List[Dict]) -> str:
     
     if critical_count >= 1 or high_count >= 3:
         return "High"
-    if high_count >= 1 or len(anomalies) >= 3:
         return "Medium"
     return "Low"
 
