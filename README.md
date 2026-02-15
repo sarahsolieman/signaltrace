@@ -20,8 +20,12 @@ docker compose up --build
 **Deployment**: Docker Compose
 
 ## Sample Data
-git branch -M main
-Pre-generated log files in `data/`:
+Pre-generated log files are available in the `data/` directory. 
+Upload any of these files via the web UI to test detection:
+**To test:** 
+Login at http://localhost:3000
+click "Choose File"
+select any `.jsonl` file from the `data/` folder, and click "Analyze Log File".
 
 | File | Description | Expected Behavior |
 |------|-------------|-------------------|
