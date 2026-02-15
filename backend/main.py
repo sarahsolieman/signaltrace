@@ -272,19 +272,19 @@ def apply_deterministic_rules(ip: str, features: Dict) -> List[str]:
     return triggered
 
 
-    def assign_severity(triggered_rules: List[str], isolation_score: float) -> str:
-        """
-        Assign severity based on triggered rules
-        
-        Critical: (High Burst AND High Deny Rate) OR (Extreme Data Transfer AND High Off-Hours)
-        High: Any two rule triggers
-        Medium: Any single rule trigger OR isolation_score >= 0.85
-        Low: isolation_score between 0.75 and 0.85
-        """
-        
-        if not triggered_rules and isolation_score < 0.75:
-            return None  # Not anomalous
+def assign_severity(triggered_rules: List[str], isolation_score: float) -> str:
+    """
+    Assign severity based on triggered rules
     
+    Critical: (High Burst AND High Deny Rate) OR (Extreme Data Transfer AND High Off-Hours)
+    High: Any two rule triggers
+    Medium: Any single rule trigger OR isolation_score >= 0.85
+    Low: isolation_score between 0.75 and 0.85
+    """
+    
+    if not triggered_rules and isolation_score < 0.75:
+        return None  # Not anomalous
+
     # Critical conditions
     if ("High Burst" in triggered_rules and "High Deny Rate" in triggered_rules):
         return "Critical"
