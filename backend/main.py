@@ -500,6 +500,8 @@ def generate_summary(total_logs: int, total_ips: int, anomalies: List[Dict]) -> 
     # Group by severity
     critical = [a for a in anomalies if a['severity'] == 'Critical']
     high = [a for a in anomalies if a['severity'] == 'High']
+    medium = [a for a in anomalies if a['severity'] == 'Medium']
+    low = [a for a in anomalies if a['severity'] == 'Low']
     
     summary_parts = [f"Analyzed {total_logs} logs from {total_ips} IPs."]
     
@@ -511,7 +513,17 @@ def generate_summary(total_logs: int, total_ips: int, anomalies: List[Dict]) -> 
         ips = ', '.join([a['clientip'] for a in high[:3]])
         summary_parts.append(f"HIGH: {len(high)} IP(s) with suspicious behavior ({ips}).")
     
-    summary_parts.append("Immediate investigation recommended.")
+    if medium:
+        ips = ', '.join([a['clientip'] for a in medium[:3]])
+        summary_parts.append(f"MEDIUM: {len(medium)} IP(s) with unusual activity ({ips}).")
+    
+    # Add recommendation based on severity
+    if critical or high:
+        summary_parts.append("Immediate investigation recommended.")
+    elif medium:
+        summary_parts.append("Review recommended.")
+    elif low:
+        summary_parts.append(f"LOW: {len(low)} IP(s) with minor statistical anomalies. Monitor for patterns.")
     
     return " ".join(summary_parts)
 
