@@ -361,7 +361,8 @@ def detect_anomalies(logs: List[Dict]) -> Dict:
     ] for ip in ips])
     
     # Fit IsolationForest (expect 3% anomalies - realistic for enterprise traffic)
-    iso_forest = IsolationForest(contamination=0.03, random_state=42)
+    # With auto contamination. This prevents forced flagging in small datasets
+    iso_forest = IsolationForest(contamination='auto', random_state=42)
     predictions = iso_forest.fit_predict(X)
     scores = iso_forest.score_samples(X)
     
