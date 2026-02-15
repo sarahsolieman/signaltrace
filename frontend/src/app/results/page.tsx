@@ -279,7 +279,7 @@ export default function ResultsPage() {
                             color: '#c33',
                             borderRadius: '12px',
                             fontSize: '0.75rem',
-                            fontWeight: 500
+                            fontWeight: 500,
                             marginRight: '0.5rem'
                           }}>
                             {rule}
