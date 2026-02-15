@@ -332,17 +332,18 @@ export default function ResultsPage() {
           </div>
         )}
 
-        {/* 4. Raw Logs Table */}
-        <div style={{
-          backgroundColor: 'white',
-          padding: '2rem',
-          borderRadius: '8px',
-          boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <h2 style={{ margin: 0, fontSize: '1.5rem' }}>
-              All Logs ({displayedLogs.length})
-            </h2>
+      {/* 4. Raw Logs Table */}
+      <div style={{
+        backgroundColor: 'white',
+        padding: '2rem',
+        borderRadius: '8px',
+        boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <h2 style={{ margin: 0, fontSize: '1.5rem' }}>
+            All Logs ({displayedLogs.length})
+          </h2>
+          {data.anomaly_count > 0 && (
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <button
                 onClick={() => setShowAllLogs(true)}
@@ -373,55 +374,60 @@ export default function ResultsPage() {
                 Anomalies Only
               </button>
             </div>
-          </div>
+          )}
+        </div>
 
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
-              <thead>
-                <tr style={{ backgroundColor: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
-                  <th style={{ padding: '0.75rem', textAlign: 'left' }}>Time</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'left' }}>Client IP</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'left' }}>Host</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'left' }}>Action</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'left' }}>Code</th>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
+                <th style={{ padding: '0.75rem', textAlign: 'left' }}>Time</th>
+                <th style={{ padding: '0.75rem', textAlign: 'left' }}>Client IP</th>
+                <th style={{ padding: '0.75rem', textAlign: 'left' }}>Host</th>
+                <th style={{ padding: '0.75rem', textAlign: 'left' }}>Action</th>
+                <th style={{ padding: '0.75rem', textAlign: 'left' }}>Code</th>
+                {data.anomaly_count > 0 && (
                   <th style={{ padding: '0.75rem', textAlign: 'center' }}>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {displayedLogs.slice(0, 100).map((log, idx) => (
-                  <tr key={idx} style={{
-                    backgroundColor: log.is_anomalous ? '#fff1f1' : 'white',
-                    borderBottom: '1px solid #e5e7eb'
-                  }}>
-                    <td style={{ padding: '0.75rem' }}>
-                      {new Date(log.time).toLocaleTimeString()}
-                    </td>
-                    <td style={{ padding: '0.75rem', fontFamily: 'monospace', fontSize: '0.8em' }}>
-                      {log.clientip}
-                    </td>
-                    <td style={{ padding: '0.75rem', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {log.host}
-                    </td>
-                    <td style={{ padding: '0.75rem' }}>
-                      <span style={{
-                        padding: '0.25rem 0.5rem',
-                        backgroundColor: log.action === 'ALLOW' ? '#dcfce7' : '#fee2e2',
-                        color: log.action === 'ALLOW' ? '#166534' : '#991b1b',
-                        borderRadius: '4px',
-                        fontSize: '0.75rem',
-                        fontWeight: 500
-                      }}>
-                        {log.action}
-                      </span>
-                    </td>
-                    <td style={{ padding: '0.75rem' }}>{log.responsecode}</td>
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {displayedLogs.slice(0, 100).map((log, idx) => (
+                <tr key={idx} style={{
+                  backgroundColor: log.is_anomalous ? '#fff1f1' : 'white',
+                  borderBottom: '1px solid #e5e7eb'
+                }}>
+                  <td style={{ padding: '0.75rem' }}>
+                    {new Date(log.time).toLocaleTimeString()}
+                  </td>
+                  <td style={{ padding: '0.75rem', fontFamily: 'monospace', fontSize: '0.8em' }}>
+                    {log.clientip}
+                  </td>
+                  <td style={{ padding: '0.75rem', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {log.host}
+                  </td>
+                  <td style={{ padding: '0.75rem' }}>
+                    <span style={{
+                      padding: '0.25rem 0.5rem',
+                      backgroundColor: log.action === 'ALLOW' ? '#dcfce7' : '#fee2e2',
+                      color: log.action === 'ALLOW' ? '#166534' : '#991b1b',
+                      borderRadius: '4px',
+                      fontSize: '0.75rem',
+                      fontWeight: 500
+                    }}>
+                      {log.action}
+                    </span>
+                  </td>
+                  <td style={{ padding: '0.75rem' }}>{log.responsecode}</td>
+                  {data.anomaly_count > 0 && (
                     <td style={{ padding: '0.75rem', textAlign: 'center' }}>
                       {log.is_anomalous && <span style={{ color: '#dc2626' }}>⚠️</span>}
                     </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
             {displayedLogs.length > 100 && (
               <div style={{ padding: '1rem', textAlign: 'center', color: '#666', fontSize: '0.875rem' }}>
                 Showing first 100 of {displayedLogs.length} logs
