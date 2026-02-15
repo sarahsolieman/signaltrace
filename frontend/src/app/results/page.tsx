@@ -22,7 +22,7 @@ interface AnalysisData {
   anomaly_count: number
   risk_level: string
   summary: string
-  detection_breakdown: { rule_based: number; statistical: number; hybrid: number; total: number }
+  detection_breakdown: { rule_based: number; statistical: number; hybrid: number; total: number; note?: string }
   time_range: { start: string; end: string; duration_hours: number }
   peak_activity?: { hour: number; event_count: number }
   timeline: Array<{ timestamp: string; clientip: string; detection_type: string; severity: string }>
@@ -89,7 +89,10 @@ export default function ResultsPage() {
     }
   }
 
-  const displayedLogs = showAllLogs ? data.logs : data.logs.filter(log => log.is_anomalous)
+  // Always show all logs if there are no anomalies, otherwise allow filtering
+  const displayedLogs = showAllLogs || data.anomaly_count === 0 
+    ? data.logs 
+    : data.logs.filter(log => log.is_anomalous)
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>

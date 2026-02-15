@@ -84,12 +84,40 @@ Unsupervised statistical anomaly detection:
 - **Model**: IsolationForest with `contamination=0.03`
 - **Output**: Anomaly score normalized to 0-1 range
 - **Threshold**: Score ≥ 0.75 for flagging (statistical-only detections)
+- **Minimum Dataset Size**: ≥20 unique IPs required
 
 **Contamination Calibration**: Set to 3% based on realistic enterprise traffic patterns where most IPs exhibit normal behavior. This prevents false positives from normal variance in baseline traffic.
 
 **Threshold Rationale**: Statistical-only detections require high confidence (≥0.85 for Medium severity) to avoid alert fatigue. Rule-based detections have lower bars since patterns are explicit.
 
+**Small Dataset Handling**: When fewer than 20 unique IPs are present, IsolationForest is skipped entirely. With small samples, the model cannot reliably distinguish normal variance from true anomalies. In these cases, only rule-based detection is used.
+
 IsolationForest identifies behavioral outliers that may not match known attack patterns.
+
+### False Positive Control
+
+The system is calibrated to minimize false positives in normal traffic:
+
+**IsolationForest Contamination (3%)**:
+- Reflects realistic enterprise environments where <5% of IPs typically exhibit anomalous behavior
+- Prevents flagging normal variance in baseline traffic
+- Based on observation that most corporate network traffic is legitimate
+
+**Statistical Threshold (0.75)**:
+- Only the top 25% most anomalous IPs (by statistical measure alone) are flagged
+- Requires strong deviation from normal behavior
+- Reduces alert fatigue for SOC analysts
+
+**Minimum Dataset Size (20 IPs)**:
+- IsolationForest requires sufficient data to build a reliable model of "normal" behavior
+- With <20 IPs, statistical variance overwhelms signal - the model cannot distinguish normal differences from true anomalies
+- Small datasets fall back to rule-based detection only, which remains reliable regardless of sample size
+- This prevents false positives from statistical artifacts in small samples
+
+**Hybrid Detection Advantage**:
+- When rules trigger (e.g., SQL injection pattern), immediate flagging regardless of statistical score
+- Statistical score provides additional confirmation for ambiguous cases
+- Combining both methods provides higher confidence than either alone
 
 ### Severity Assignment
 

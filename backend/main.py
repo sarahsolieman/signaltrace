@@ -60,7 +60,7 @@ class AnalysisResponse(BaseModel):
     anomaly_count: int
     risk_level: str
     summary: str
-    detection_breakdown: Dict[str, int]
+    detection_breakdown: Dict[str, Any]
     time_range: Dict[str, Any]
     peak_activity: Optional[Dict[str, Any]]
     timeline: List[Dict]
@@ -396,7 +396,8 @@ def detect_anomalies(logs: List[Dict]) -> Dict:
                 "rule_based": len(rule_anomalies),
                 "statistical": 0,
                 "hybrid": 0,
-                "total": len(rule_anomalies)
+                "total": len(rule_anomalies),
+                "note": f"Statistical analysis skipped (dataset has {len(ip_features)} IPs, minimum 20 required)"  # ADD THIS LINE
             },
             "time_range": get_time_range(logs),
             "peak_activity": get_peak_activity(logs),
