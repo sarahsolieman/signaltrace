@@ -1,206 +1,126 @@
 # signaltrace
 
-Minimal log analysis and anomaly detection system using hybrid detection (rule-based + IsolationForest).
+A minimal log analysis and anomaly detection system combining deterministic rule-based detection with unsupervised machine learning (IsolationForest) for behavioral anomaly scoring. Designed for SOC analysts to quickly identify security threats in web proxy logs.
+
+**Problem:** Security teams need to identify attacks in high-volume log data without labeled training datasets. Traditional signature-based detection misses novel threats; pure statistical methods generate false positives on normal variance.
+
+**Solution:** Hybrid detection using explicit attack patterns (rules) for precision and IsolationForest for coverage of unknown behavioral anomalies.
+
+---
 
 ## Quick Start
 
 ```bash
-# Start the application
 docker compose up --build
-
-# Access at http://localhost:3000
-# Login: analyst@tenex.ai / password123
 ```
+
+- **URL:** http://localhost:3000
+- **Login:** analyst@tenex.ai / password123
+- **Test:** Upload any `.jsonl` file from `data/` directory
+
+---
 
 ## Architecture
 
-**Backend**: FastAPI (Python)  
-**Frontend**: Next.js (TypeScript)  
-**Detection**: Hybrid (Deterministic Rules + IsolationForest)  
-**Deployment**: Docker Compose
+**Backend:**
+- FastAPI (Python)
+- JWT authentication
+- Log parsing (regex)
+- Per-IP feature aggregation
+- Deterministic rule engine
+- IsolationForest statistical model
+- Stateless processing
 
-## Sample Data
-Pre-generated log files are available in the `data/` directory. 
-Upload any of these files via the web UI to test detection:
-**To test:** 
-Login at http://localhost:3000
-click "Choose File"
-select any `.jsonl` file from the `data/` folder, and click "Analyze Log File".
+**Frontend:**
+- Next.js 14 (TypeScript)
+- 3 pages: Login, Upload, Results
+- 4 result sections: Summary, Timeline, Anomaly Cards, Log Table
 
-| File | Description | Expected Behavior |
-|------|-------------|-------------------|
-| `baseline_small.jsonl` | 1,000 normal events | 0 anomalies, Low risk |
-| `baseline_medium.jsonl` | 3,000 normal events | 0 anomalies, Low risk |
-| `baseline_large.jsonl` | 5,000 normal events | 0 anomalies, Low risk |
-| `anomalous_credential_stuffing.jsonl` | Credential stuffing attack | 1 Critical anomaly, High risk |
-| `anomalous_exfiltration.jsonl` | Data exfiltration | 1 Critical anomaly, High risk |
-| `anomalous_scanning.jsonl` | Network scanning | 1 High anomaly, High risk |
+**Deployment:**
+- Docker Compose
+- No database (in-memory processing)
+- No external dependencies
 
-### Anomaly Scenarios
+---
 
-**Credential Stuffing** (`203.0.113.45`):
-- 150 requests in 1 minute (>100 req/min threshold)
-- 90% deny rate (>60% threshold)
-- Triggers: "High Burst" + "High Deny Rate"
-- Expected: Critical severity
+## Project Structure
 
-**Data Exfiltration** (`192.168.1.150`):
-- 75 MB total transfer (>50 MB threshold)
-- 100% off-hours activity (>70% threshold)
-- Triggers: "Extreme Data Transfer" + "High Off-Hours Activity"
-- Expected: Critical severity
-
-**Scanning** (`198.51.100.89`):
-- 30 unique hosts accessed (>20 threshold)
-- 66% deny rate (>60% threshold)
-- Triggers: "High Unique Hosts" + "High Deny Rate"
-- Expected: High severity
-
-## Detection Methodology
-
-### Feature Extraction (Per-IP)
-
-Five behavioral features are extracted for each client IP:
-
-1. **requests_per_minute_peak**: Maximum requests in any 1-minute window
-2. **deny_rate**: Proportion of DENY actions (0-1)
-3. **total_bytes_transferred**: Sum of `responsesize` field
-4. **unique_hosts_count**: Distinct hostnames extracted from URLs
-5. **off_hours_request_ratio**: Proportion of requests between 00:00-05:00 UTC
-
-### Deterministic Rules
-
-Explicit thresholds trigger high-confidence detections:
-
-| Rule | Threshold | Confidence |
-|------|-----------|------------|
-| High Burst | requests_per_minute_peak ≥ 100 | High |
-| High Deny Rate | deny_rate ≥ 0.6 | High |
-| Extreme Data Transfer | total_bytes_transferred ≥ 50 MB | High |
-| High Unique Hosts | unique_hosts_count ≥ 20 | High |
-| High Off-Hours Activity | off_hours_request_ratio ≥ 0.7 | Medium |
-
-### IsolationForest
-
-Unsupervised statistical anomaly detection:
-
-- **Input**: 5-dimensional feature vector per IP
-- **Model**: IsolationForest with `contamination=0.03`
-- **Output**: Anomaly score normalized to 0-1 range
-- **Threshold**: Score ≥ 0.75 for flagging (statistical-only detections)
-- **Minimum Dataset Size**: ≥20 unique IPs required
-
-**Contamination Calibration**: Set to 3% based on realistic enterprise traffic patterns where most IPs exhibit normal behavior. This prevents false positives from normal variance in baseline traffic.
-
-**Threshold Rationale**: Statistical-only detections require high confidence (≥0.85 for Medium severity) to avoid alert fatigue. Rule-based detections have lower bars since patterns are explicit.
-
-**Small Dataset Handling**: When fewer than 20 unique IPs are present, IsolationForest is skipped entirely. With small samples, the model cannot reliably distinguish normal variance from true anomalies. In these cases, only rule-based detection is used.
-
-IsolationForest identifies behavioral outliers that may not match known attack patterns.
-
-### False Positive Control
-
-The system is calibrated to minimize false positives in normal traffic:
-
-**IsolationForest Contamination (3%)**:
-- Reflects realistic enterprise environments where <5% of IPs typically exhibit anomalous behavior
-- Prevents flagging normal variance in baseline traffic
-- Based on observation that most corporate network traffic is legitimate
-
-**Statistical Threshold (0.75)**:
-- Only the top 25% most anomalous IPs (by statistical measure alone) are flagged
-- Requires strong deviation from normal behavior
-- Reduces alert fatigue for SOC analysts
-
-**Minimum Dataset Size (20 IPs)**:
-- IsolationForest requires sufficient data to build a reliable model of "normal" behavior
-- With <20 IPs, statistical variance overwhelms signal - the model cannot distinguish normal differences from true anomalies
-- Small datasets fall back to rule-based detection only, which remains reliable regardless of sample size
-- This prevents false positives from statistical artifacts in small samples
-
-**Hybrid Detection Advantage**:
-- When rules trigger (e.g., SQL injection pattern), immediate flagging regardless of statistical score
-- Statistical score provides additional confirmation for ambiguous cases
-- Combining both methods provides higher confidence than either alone
-
-### Severity Assignment
-
-Severity is derived deterministically:
-
-**Critical**:
-- (High Burst AND High Deny Rate) OR
-- (Extreme Data Transfer AND High Off-Hours Activity)
-
-**High**:
-- Any two rule triggers
-
-**Medium**:
-- Any single rule trigger OR
-- IsolationForest score ≥ 0.85 (very strong statistical signal)
-
-**Low**:
-- IsolationForest score between 0.75 and 0.85
-- No rule triggers
-
-**Rationale**: Statistical-only anomalies require higher confidence thresholds to reduce false positives. Rule-based detections leverage explicit attack patterns and thus require less statistical confirmation.
-
-### Confidence Score
-
-Confidence (0-1) is calculated as:
 ```
-confidence = (0.7 × rule_score) + (0.3 × isolation_score)
-
-where:
-  rule_score = triggered_rules_count / 5  (5 total rules defined)
-  isolation_score = normalized IsolationForest anomaly score (0-1)
+signaltrace/
+├── backend/
+│   ├── main.py              # FastAPI + detection logic
+│   ├── requirements.txt
+│   └── Dockerfile
+├── frontend/
+│   ├── src/app/
+│   │   ├── login/page.tsx
+│   │   ├── upload/page.tsx
+│   │   └── results/page.tsx
+│   ├── package.json
+│   └── Dockerfile
+├── data/
+│   ├── baseline_small.jsonl
+│   ├── baseline_medium.jsonl
+│   ├── baseline_large.jsonl
+│   ├── anomalous_credential_stuffing.jsonl
+│   ├── anomalous_exfiltration.jsonl
+│   └── anomalous_scanning.jsonl
+├── generate_logs.py
+├── docker-compose.yml
+└── README.md
 ```
 
-**Total Rules Defined:**
-1. High Burst (requests_per_minute_peak ≥ 100)
-2. High Deny Rate (deny_rate ≥ 0.6)
-3. Extreme Data Transfer (total_bytes_transferred ≥ 50 MB)
-4. High Unique Hosts (unique_hosts_count ≥ 20)
-5. High Off-Hours Activity (off_hours_request_ratio ≥ 0.7)
+---
 
-**Maximum Confidence:** Achieved when all 5 rules trigger AND IsolationForest score = 1.0
+## API Contract
 
-### Risk Level Derivation
+### POST `/api/auth/login`
 
-Overall risk is determined from severity distribution:
+**Request:**
+```json
+{
+  "email": "analyst@tenex.ai",
+  "password": "password123"
+}
+```
 
-- **High Risk**: ≥1 Critical anomaly OR ≥1 High anomaly
-- **Medium Risk**: ≥1 Medium anomaly OR ≥3 Low anomalies
-- **Low Risk**: Only 1-2 Low anomalies or none
+**Response:**
+```json
+{
+  "token": "eyJ...",
+  "email": "analyst@tenex.ai"
+}
+```
 
-## Frontend Layout
+### POST `/api/analyze`
 
-### 1. Summary Card
-- File metadata (name, log count, time range)
-- Anomaly count and risk level
-- Detection breakdown (rule-based vs statistical)
-- Deterministic summary text
+**Headers:** `Authorization: Bearer <token>`  
+**Body:** FormData with `file` field (JSONL)
 
-### 2. Timeline
-- Chronological list of anomaly events
-- Timestamp, IP, detection type, severity
-- Color-coded by severity
+**Response:**
+```json
+{
+  "total_logs": 1000,
+  "anomaly_count": 1,
+  "risk_level": "High",
+  "summary": "Analysis identified...",
+  "detection_breakdown": {
+    "rule_based": 1,
+    "statistical": 0,
+    "hybrid": 0,
+    "total": 1
+  },
+  "anomalies": [...],
+  "timeline": [...],
+  "logs": [...]
+}
+```
 
-### 3. Anomaly Cards
-- Per-IP anomaly details
-- Severity, confidence score, detection method
-- Triggered rules listed
-- Feature values displayed
-- Plain-text explanation
+---
 
-### 4. Raw Logs Table
-- All log entries with key fields
-- Filter: All / Anomalies Only
-- Anomalous entries highlighted
-- Shows: time, clientip, host, action, response code
+## Log Format Specification
 
-## Log Format
-
-Logs must be JSONL (one JSON object per line) with these fields:
+Logs must be **JSONL** (one JSON object per line):
 
 ```json
 {
@@ -218,122 +138,148 @@ Logs must be JSONL (one JSON object per line) with these fields:
 }
 ```
 
-Required field constraints:
+**Required Constraints:**
 - `time`: ISO8601 UTC with Z suffix
 - `action`: Exactly "ALLOW" or "DENY"
-- `url`: Full URL with scheme and hostname
+- `url`: Full URL including scheme and hostname
 
-## API Endpoints
+---
 
-### POST `/api/auth/login`
-Authenticate and receive JWT token.
+## Sample Data
 
-**Request**:
-```json
-{
-  "email": "analyst@tenex.ai",
-  "password": "password123"
-}
+| File | Description | Expected Behavior |
+|------|-------------|-------------------|
+| `baseline_small.jsonl` | 1,000 normal events | 0 anomalies, Low risk |
+| `baseline_medium.jsonl` | 3,000 normal events | 0 anomalies, Low risk |
+| `baseline_large.jsonl` | 5,000 normal events | 0 anomalies, Low risk |
+| `anomalous_credential_stuffing.jsonl` | Brute force attack | 1 Critical anomaly, High risk |
+| `anomalous_exfiltration.jsonl` | Data theft | 1 Critical anomaly, High risk |
+| `anomalous_scanning.jsonl` | Network reconnaissance | 1 High anomaly, High risk |
+
+**Attack Scenarios:**
+
+**Credential Stuffing** (IP: 203.0.113.45)  
+150 requests/minute, 90% deny rate → Triggers: High Burst + High Deny Rate
+
+**Data Exfiltration** (IP: 192.168.1.150)  
+75 MB transferred during off-hours (2-4 AM) → Triggers: Extreme Data Transfer + High Off-Hours Activity
+
+**Scanning** (IP: 198.51.100.89)  
+30 unique hosts probed, 66% denied → Triggers: High Unique Hosts + High Deny Rate
+
+---
+
+## Detection System
+
+### 8.1 Behavioral Feature Extraction
+
+Five features extracted per client IP:
+
+1. **requests_per_minute_peak** - Maximum requests in any 1-minute window
+2. **deny_rate** - Proportion of DENY actions (0-1)
+3. **total_bytes_transferred** - Sum of responsesize field
+4. **unique_hosts_count** - Distinct hostnames extracted from URLs
+5. **off_hours_request_ratio** - Proportion of requests 00:00-05:00 UTC
+
+### 8.2 Deterministic Rule Engine
+
+Explicit threshold-based detection:
+
+| Rule | Feature Used | Threshold |
+|------|--------------|-----------|
+| High Burst | requests_per_minute_peak | ≥ 100 |
+| High Deny Rate | deny_rate | ≥ 0.6 |
+| Extreme Data Transfer | total_bytes_transferred | ≥ 50 MB |
+| High Unique Hosts | unique_hosts_count | ≥ 20 |
+| High Off-Hours Activity | off_hours_request_ratio | ≥ 0.7 |
+
+**Purpose:** High-precision detection of known attack patterns.
+
+### 8.3 IsolationForest Statistical Model
+
+**Input:** Same 5 features (not thresholds)  
+**Model:** IsolationForest with contamination=0.03  
+**Output:** Normalized anomaly score (0-1)  
+**Minimum Dataset:** ≥20 unique IPs required
+
+**Key Properties:**
+- Does not use thresholds
+- Does not explain anomalies
+- Identifies behavioral outliers statistically
+- Skipped if <20 IPs (falls back to rules only)
+
+**Calibration:**
+- `contamination=0.03`: Expects 3% of IPs to be anomalous (realistic for enterprise traffic)
+- `threshold=0.75`: High threshold for statistical-only detections (reduces false positives)
+- `minimum=20 IPs`: Prevents false positives from normal variance in small samples
+
+**Purpose:** Coverage for novel or unknown threats not matching rule patterns.
+
+### 8.4 How They Work Together (Hybrid Logic)
+
+**Detection Pipeline:**
+
+1. **Feature Extraction** - Compute 5 behavioral features per IP
+2. **Rule Evaluation** - Check if any of 5 thresholds exceeded
+3. **IsolationForest Scoring** - Compute statistical anomaly score (if ≥20 IPs)
+4. **Severity Assignment** - Classify based on triggered rules + IF score
+5. **Confidence Calculation** - Weighted combination: `0.7 × rule_score + 0.3 × IF_score`
+6. **Risk Level Derivation** - File-level aggregation from all anomaly severities
+
+**Detection Method Classification:**
+- **Rule-based:** Rules triggered, IF score <0.75
+- **Statistical:** IF score ≥0.75, no rules triggered
+- **Hybrid:** Both rules triggered AND IF score ≥0.75 (strongest signal)
+
+---
+
+## Severity vs Confidence vs Risk
+
+Three distinct abstraction layers:
+
+**Severity** (Per-IP Classification):
+- Critical: (High Burst AND High Deny Rate) OR (Extreme Transfer AND Off-Hours)
+- High: Any 2 rule triggers
+- Medium: 1 rule trigger OR IF score ≥0.85
+- Low: IF score 0.75-0.85, no rules
+
+**Confidence** (Signal Strength Score):
+```
+confidence = (0.7 × rule_score) + (0.3 × IF_score)
+where rule_score = triggered_rules / 5
+```
+Range: 0-1 (represents detection signal strength, not probability of maliciousness)
+
+**Risk Level** (File-Level Aggregation):
+- High Risk: ≥1 Critical OR ≥1 High anomaly
+- Medium Risk: ≥1 Medium OR ≥3 Low anomalies
+- Low Risk: ≤2 Low anomalies or none
+
+**Conceptual Flow:**
+```
+Features → Rules/Model → Severity → Confidence → File Risk
 ```
 
-**Response**:
-```json
-{
-  "token": "eyJ...",
-  "email": "analyst@tenex.ai"
-}
-```
+**Important Distinction:**
+- Severity depends on **which** rules trigger (specific attack patterns)
+- Confidence depends on **how many** signals fire (total evidence strength)
 
-### POST `/api/analyze`
-Upload and analyze log file.
-
-**Headers**: `Authorization: Bearer <token>`  
-**Body**: FormData with `file` field (JSONL)
-
-**Response**: Full analysis object with anomalies, timeline, and logs
-
-## Regenerating Sample Logs
-
-```bash
-python3 generate_logs.py
-```
-
-This creates all 6 sample files in `data/` directory with deterministic output (seeded random).
-
-
-## Testing
-
-Upload each anomalous file and verify:
-
-1. **credential_stuffing.jsonl**:
-   - 1 Critical anomaly (IP 203.0.113.45)
-   - Triggered rules: High Burst, High Deny Rate
-   - Confidence: ~0.75-0.85
-   - Risk: High
-
-2. **exfiltration.jsonl**:
-   - 1 Critical anomaly (IP 192.168.1.150)
-   - Triggered rules: Extreme Data Transfer, High Off-Hours Activity
-   - Confidence: ~0.70-0.80
-   - Risk: High
-
-3. **scanning.jsonl**:
-   - 1 High anomaly (IP 198.51.100.89)
-   - Triggered rules: High Unique Hosts, High Deny Rate
-   - Confidence: ~0.75-0.85
-   - Risk: High
-
-## Project Structure
-
-```
-signaltrace/
-├── backend/
-│   ├── main.py              # FastAPI app + detection logic
-│   ├── requirements.txt
-│   └── Dockerfile
-├── frontend/
-│   ├── src/app/
-│   │   ├── login/page.tsx   # Login page
-│   │   ├── upload/page.tsx  # File upload page
-│   │   └── results/page.tsx # Analysis results (4 sections)
-│   ├── package.json
-│   └── Dockerfile
-├── data/
-│   ├── baseline_small.jsonl
-│   ├── baseline_medium.jsonl
-│   ├── baseline_large.jsonl
-│   ├── anomalous_credential_stuffing.jsonl
-│   ├── anomalous_exfiltration.jsonl
-│   └── anomalous_scanning.jsonl
-├── generate_logs.py         # Synthetic log generator
-├── docker-compose.yml
-└── README.md
-```
+---
 
 ## Design Decisions
 
-### Why IsolationForest?
-- No labeled training data required (unsupervised)
-- Well-suited for anomaly detection
-- Established algorithm in security/fraud detection
-- Fast training and inference
-- Interpretable via feature contributions
+**Why IsolationForest?**  
+No labeled training data required (unsupervised), established in fraud/security detection, fast inference, interpretable via feature contributions.
 
-### Why Hybrid Approach?
-- **Rules**: High precision for known attack patterns
-- **Statistical**: Coverage for novel or unknown threats
-- **Combined**: Reduces false negatives while maintaining explainability
+**Why Hybrid Approach?**  
+Rules provide precision for known attacks; IsolationForest provides coverage for novel threats. Combining both reduces false negatives while maintaining explainability.
 
-### Why No LLM for Summaries?
-- Adds latency and API dependencies
-- Deterministic summaries are reproducible
-- Rule-based text generation is sufficient for structured findings
-- Keeps implementation simple and testable
+---
 
-### Why No Database?
-- Stateless processing is simpler
-- In-memory analysis is fast enough for demo
-- Production would add PostgreSQL for history/trends
+**Regenerate sample logs:** `python3 generate_logs.py`  
+
+ 
+
 
 
 
