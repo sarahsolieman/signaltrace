@@ -319,8 +319,9 @@ def calculate_confidence(triggered_rules: List[str], isolation_score: float) -> 
     # Total possible rules
     total_rules = 5  # High Burst, High Deny Rate, Extreme Data Transfer, High Unique Hosts, High Off-Hours
     
-    # Rule contribution (0-1)
-    rule_score = min(len(triggered_rules) / total_rules, 1.0)
+    # Treat rule triggers as binary evidence:
+    # any triggered rule = strong deterministic signal (1.0), none = 0.0 
+    rule_score = 1.0 if triggered_rules else 0.0
     
     # IF contribution (already 0-1)
     if_contribution = isolation_score
@@ -361,8 +362,12 @@ def detect_anomalies(logs: List[Dict]) -> Dict:
                 severity = "High"
             else:
                 severity = "Medium"
-            
-            confidence = min(len(triggered_rules) / 5, 1.0)
+                
+                
+            #In rule-only mode (<20 IPs), confidence is binary.
+            # Any triggered rule represents a high-precision deterministic signal,
+            # so we assign full confidence rather than scaling by rule count.
+            confidence = 1.0
             
             rule_anomalies.append({
                 "clientip": ip,
