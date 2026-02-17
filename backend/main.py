@@ -362,7 +362,7 @@ def detect_anomalies(logs: List[Dict]) -> Dict:
             else:
                 severity = "Medium"
             
-            confidence = min(len(triggered_rules) / 3, 1.0)
+            confidence = min(len(triggered_rules) / 5, 1.0)
             
             rule_anomalies.append({
                 "clientip": ip,

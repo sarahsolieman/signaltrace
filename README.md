@@ -10,9 +10,18 @@ A minimal log analysis and anomaly detection system combining deterministic rule
 
 ## Quick Start
 
+### Prerequisites
+- Docker Desktop installed and running  
+- Git (if cloning from a repository)
+
+### Run Locally
+
 ```bash
+# 1. Unzip and navigate into the project directory
+cd signaltrace
+
+# 2. Build and start the application
 docker compose up --build
-```
 
 - **URL:** http://localhost:3000
 - **Login:** analyst@tenex.ai / password123
@@ -69,55 +78,7 @@ signaltrace/
 ├── docker-compose.yml
 └── README.md
 ```
-
 ---
-
-## API Contract
-
-### POST `/api/auth/login`
-
-**Request:**
-```json
-{
-  "email": "analyst@tenex.ai",
-  "password": "password123"
-}
-```
-
-**Response:**
-```json
-{
-  "token": "eyJ...",
-  "email": "analyst@tenex.ai"
-}
-```
-
-### POST `/api/analyze`
-
-**Headers:** `Authorization: Bearer <token>`  
-**Body:** FormData with `file` field (JSONL)
-
-**Response:**
-```json
-{
-  "total_logs": 1000,
-  "anomaly_count": 1,
-  "risk_level": "High",
-  "summary": "Analysis identified...",
-  "detection_breakdown": {
-    "rule_based": 1,
-    "statistical": 0,
-    "hybrid": 0,
-    "total": 1
-  },
-  "anomalies": [...],
-  "timeline": [...],
-  "logs": [...]
-}
-```
-
----
-
 ## Log Format Specification
 
 Logs must be **JSONL** (one JSON object per line):
