@@ -372,7 +372,7 @@ def detect_anomalies(logs: List[Dict]) -> Dict:
             rule_anomalies.append({
                 "clientip": ip,
                 "severity": severity,
-                "confidence": round(confidence, 2),
+                "confidence": confidence,
                 "detection_method": "Rule-based",
                 "triggered_rules": triggered_rules,
                 "features": {

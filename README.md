@@ -22,10 +22,11 @@ cd signaltrace
 
 # 2. Build and start the application
 docker compose up --build
+```
 
-- **URL:** http://localhost:3000
-- **Login:** analyst@tenex.ai / password123
-- **Test:** Upload any `.jsonl` file from `data/` directory
+- **URL:** http://localhost:3000  
+- **Login:** analyst@tenex.ai / password123  
+- **Test:** Upload any `.jsonl` file from `data/` directory  
 
 ---
 
@@ -78,7 +79,9 @@ signaltrace/
 ├── docker-compose.yml
 └── README.md
 ```
+
 ---
+
 ## Log Format Specification
 
 Logs must be **JSONL** (one JSON object per line):
@@ -100,9 +103,9 @@ Logs must be **JSONL** (one JSON object per line):
 ```
 
 **Required Constraints:**
-- `time`: ISO8601 UTC with Z suffix
-- `action`: Exactly "ALLOW" or "DENY"
-- `url`: Full URL including scheme and hostname
+- `time`: ISO8601 UTC with Z suffix  
+- `action`: Exactly "ALLOW" or "DENY"  
+- `url`: Full URL including scheme and hostname  
 
 ---
 
@@ -117,34 +120,34 @@ Logs must be **JSONL** (one JSON object per line):
 | `anomalous_exfiltration.jsonl` | Data theft | 1 Critical anomaly, High risk |
 | `anomalous_scanning.jsonl` | Network reconnaissance | 1 High anomaly, High risk |
 
-**Attack Scenarios:**
+### Attack Scenarios
 
 **Credential Stuffing** (IP: 203.0.113.45)  
-150 requests/minute, 90% deny rate → Triggers: High Burst + High Deny Rate
+150 requests/minute, 90% deny rate → Triggers: High Burst + High Deny Rate  
 
 **Data Exfiltration** (IP: 192.168.1.150)  
-75 MB transferred during off-hours (2-4 AM) → Triggers: Extreme Data Transfer + High Off-Hours Activity
+75 MB transferred during off-hours (2–4 AM) → Triggers: Extreme Data Transfer + High Off-Hours Activity  
 
 **Scanning** (IP: 198.51.100.89)  
-30 unique hosts probed, 66% denied → Triggers: High Unique Hosts + High Deny Rate
+30 unique hosts probed, 66% denied → Triggers: High Unique Hosts + High Deny Rate  
 
 ---
 
 ## Detection System
 
-### 8.1 Behavioral Feature Extraction
+### Behavioral Feature Extraction
 
 Five features extracted per client IP:
 
-1. **requests_per_minute_peak** - Maximum requests in any 1-minute window
-2. **deny_rate** - Proportion of DENY actions (0-1)
-3. **total_bytes_transferred** - Sum of responsesize field
-4. **unique_hosts_count** - Distinct hostnames extracted from URLs
-5. **off_hours_request_ratio** - Proportion of requests 00:00-05:00 UTC
+1. **requests_per_minute_peak** — Maximum requests in any 1-minute window  
+2. **deny_rate** — Proportion of DENY actions (0–1)  
+3. **total_bytes_transferred** — Sum of `responsesize` field  
+4. **unique_hosts_count** — Distinct hostnames extracted from URLs  
+5. **off_hours_request_ratio** — Proportion of requests 00:00–05:00 UTC  
 
-### 8.2 Deterministic Rule Engine
+---
 
-Explicit threshold-based detection:
+### Deterministic Rule Engine
 
 | Rule | Feature Used | Threshold |
 |------|--------------|-----------|
@@ -154,90 +157,107 @@ Explicit threshold-based detection:
 | High Unique Hosts | unique_hosts_count | ≥ 20 |
 | High Off-Hours Activity | off_hours_request_ratio | ≥ 0.7 |
 
-**Purpose:** High-precision detection of known attack patterns.
+Purpose: High-precision detection of known attack patterns.
 
-### 8.3 IsolationForest Statistical Model
+---
 
-**Input:** Same 5 features (not thresholds)  
-**Model:** IsolationForest with contamination=0.03  
-**Output:** Normalized anomaly score (0-1)  
-**Minimum Dataset:** ≥20 unique IPs required
+### IsolationForest Statistical Model
 
-**Key Properties:**
-- Does not use thresholds
-- Does not explain anomalies
-- Identifies behavioral outliers statistically
-- Skipped if <20 IPs (falls back to rules only)
+- **Input:** Same 5 features (not thresholds)  
+- **Model:** IsolationForest with contamination=0.03  
+- **Output:** Normalized anomaly score (0–1)  
+- **Minimum Dataset:** ≥20 unique IPs required  
 
-**Calibration:**
-- `contamination=0.03`: Expects 3% of IPs to be anomalous (realistic for enterprise traffic)
-- `threshold=0.75`: High threshold for statistical-only detections (reduces false positives)
-- `minimum=20 IPs`: Prevents false positives from normal variance in small samples
+Calibration:
+- `contamination=0.03` reflects realistic enterprise anomaly rates  
+- `threshold=0.75` reduces statistical false positives  
+- `<20 IPs` → statistical model skipped  
 
-**Purpose:** Coverage for novel or unknown threats not matching rule patterns.
+Purpose: Coverage for novel or unknown threats not matching rule patterns.
 
-### 8.4 How They Work Together (Hybrid Logic)
+---
 
-**Detection Pipeline:**
+## Hybrid Logic
 
-1. **Feature Extraction** - Compute 5 behavioral features per IP
-2. **Rule Evaluation** - Check if any of 5 thresholds exceeded
-3. **IsolationForest Scoring** - Compute statistical anomaly score (if ≥20 IPs)
-4. **Severity Assignment** - Classify based on triggered rules + IF score
-5. **Confidence Calculation** - Weighted combination: `0.7 × rule_score + 0.3 × IF_score`
-6. **Risk Level Derivation** - File-level aggregation from all anomaly severities
+Detection Pipeline:
 
-**Detection Method Classification:**
-- **Rule-based:** Rules triggered, IF score <0.75
-- **Statistical:** IF score ≥0.75, no rules triggered
-- **Hybrid:** Both rules triggered AND IF score ≥0.75 (strongest signal)
+1. Feature Extraction  
+2. Rule Evaluation  
+3. IsolationForest Scoring (if ≥20 IPs)  
+4. Severity Assignment  
+5. Confidence Calculation  
+6. Risk Level Derivation  
+
+Detection Method Classification:
+- Rule-based  
+- Statistical  
+- Hybrid  
 
 ---
 
 ## Severity vs Confidence vs Risk
 
-Three distinct abstraction layers:
+### Severity (Per-IP)
 
-**Severity** (Per-IP Classification):
-- Critical: (High Burst AND High Deny Rate) OR (Extreme Transfer AND Off-Hours)
-- High: Any 2 rule triggers
-- Medium: 1 rule trigger OR IF score ≥0.85
-- Low: IF score 0.75-0.85, no rules
+- Critical: (High Burst AND High Deny Rate) OR (Extreme Transfer AND Off-Hours)  
+- High: Any 2 rule triggers  
+- Medium: 1 rule trigger OR IF score ≥0.85  
+- Low: IF score 0.75–0.85  
 
-**Confidence** (Signal Strength Score):
+---
+
+### Confidence (Signal Strength Score)
+
+**Rule-Only Mode** (dataset < 20 unique IPs):
+
+```python
+confidence = 1.0
 ```
-confidence = (0.7 × rule_score) + (0.3 × IF_score)
-where rule_score = triggered_rules / 5
+
+**Hybrid Mode** (dataset ≥ 20 unique IPs):
+
+```python
+confidence = (0.7 * rule_score) + (0.3 * IF_score)
+where rule_score = 1.0 if any rules triggered, else 0.0
 ```
-Range: 0-1 (represents detection signal strength, not probability of maliciousness)
 
-**Risk Level** (File-Level Aggregation):
-- High Risk: ≥1 Critical OR ≥1 High anomaly
-- Medium Risk: ≥1 Medium OR ≥3 Low anomalies
-- Low Risk: ≤2 Low anomalies or none
+Range: 0–1 (represents detection signal strength, not probability of maliciousness)
 
-**Conceptual Flow:**
+---
+
+### Risk Level (File-Level)
+
+- High Risk: ≥1 Critical OR ≥1 High anomaly  
+- Medium Risk: ≥1 Medium OR ≥3 Low anomalies  
+- Low Risk: ≤2 Low anomalies or none  
+
+Conceptual Flow:
+
 ```
 Features → Rules/Model → Severity → Confidence → File Risk
 ```
 
-**Important Distinction:**
-- Severity depends on **which** rules trigger (specific attack patterns)
-- Confidence depends on **how many** signals fire (total evidence strength)
+Important Distinction:
+- Severity depends on **which** rules trigger  
+- Confidence reflects signal strength — not probability  
 
 ---
 
 ## Design Decisions
 
 **Why IsolationForest?**  
-No labeled training data required (unsupervised), established in fraud/security detection, fast inference, interpretable via feature contributions.
+Unsupervised, no labeled data required, fast inference, widely used in fraud/security.
 
-**Why Hybrid Approach?**  
-Rules provide precision for known attacks; IsolationForest provides coverage for novel threats. Combining both reduces false negatives while maintaining explainability.
+**Why Hybrid?**  
+Rules provide precision. IsolationForest provides coverage. Together they reduce false negatives while maintaining explainability.
 
 ---
 
-**Regenerate sample logs:** `python3 generate_logs.py`  
+## Regenerate Sample Logs
+
+```bash
+python3 generate_logs.py
+```
 
  
 
